@@ -8,16 +8,18 @@ import { Branch } from '@/types/schema';
 interface NodeDetailsPanelProps {
     skillName: string;
     node: Branch | null;
+    depth: number;
     isOpen: boolean;
     onClose: () => void;
     onComplete: (nodeId: string) => void;
 }
 
-type Tab = 'overview' | 'resources' | 'tutor' | 'quiz' | 'notes';
+type Tab = 'overview' | 'resources' | 'tutor' | 'quiz' | 'notes' | 'generate';
 
-export default function NodeDetailsPanel({ skillName, node, isOpen, onClose, onComplete }: NodeDetailsPanelProps) {
-    const { skills, completeNode, updateNodeNotes } = useSkillStore(); // Added updateNodeNotes
+export default function NodeDetailsPanel({ skillName, node, depth, isOpen, onClose, onComplete }: NodeDetailsPanelProps) {
+    const { skills, completeNode, updateNodeNotes, updateNodeData } = useSkillStore(); // Added updateNodeNotes
     const [activeTab, setActiveTab] = useState<Tab>('overview');
+    const [isGenerating, setIsGenerating] = useState(false);
 
     // Chat State
     const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
@@ -101,6 +103,73 @@ export default function NodeDetailsPanel({ skillName, node, isOpen, onClose, onC
         }
     };
 
+    const handleGenerateSubTasks = async () => {
+        if (!node) return;
+        setIsGenerating(true);
+        try {
+            const res = await fetch('/api/generate-skill', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    skill: skillName,
+                    level: 2,
+                    nodeContext: {
+                        name: node.name,
+                        description: node.description
+                    }
+                }),
+            });
+            const data = await res.json();
+            if (data.branches) {
+                updateNodeData(skillName, node.id, { branches: data.branches });
+                // Maybe switch tab or show success?
+            }
+        } catch (error) {
+            console.error("Generation failed", error);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleGenerateContent = async (type: 'resources' | 'quiz' | 'tutorial') => {
+        if (!node) return;
+        setIsGenerating(true);
+        try {
+            const res = await fetch('/api/generate-skill', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    skill: skillName,
+                    level: 3,
+                    generationType: type,
+                    nodeContext: {
+                        name: node.name,
+                        description: node.description
+                    }
+                }),
+            });
+            const data = await res.json();
+
+            if (type === 'resources' && data.resources) {
+                updateNodeData(skillName, node.id, { resources: data.resources });
+                setActiveTab('resources');
+            } else if (type === 'quiz' && data.quiz) {
+                updateNodeData(skillName, node.id, { quiz: data.quiz });
+                setActiveTab('quiz');
+            } else if (type === 'tutorial' && data.tutorial) {
+                // Append tutorial to description or notes? Or a new field?
+                // For now, let's append to description as a "Mini-Guide"
+                const newDesc = (node.description || '') + "\n\n## Tutorial\n" + data.tutorial;
+                updateNodeData(skillName, node.id, { description: newDesc });
+                setActiveTab('overview');
+            }
+        } catch (error) {
+            console.error("Generation failed", error);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     // Update local notes if node changes
     useEffect(() => {
         if (node) setNotes(node.notes || '');
@@ -118,6 +187,8 @@ export default function NodeDetailsPanel({ skillName, node, isOpen, onClose, onC
         { id: 'quiz', label: 'Quiz', icon: HelpCircle },
         { id: 'notes', label: 'Notes', icon: PenTool },
     ];
+
+
 
     return (
         <AnimatePresence>
@@ -202,6 +273,72 @@ export default function NodeDetailsPanel({ skillName, node, isOpen, onClose, onC
                                             </ul>
                                         </div>
                                     )}
+
+                                    {/* Generation Actions */}
+                                    <div className="mt-8 space-y-4">
+                                        <h4 className="text-lg font-bold text-slate-200 border-t border-slate-800 pt-4">Actions</h4>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {/* Generate Sub-tasks (Only for nodes without children) */}
+                                            {(!node.branches || node.branches.length === 0) && (
+                                                <button
+                                                    onClick={handleGenerateSubTasks}
+                                                    disabled={isGenerating}
+                                                    className="p-4 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-600/30 rounded-xl text-left flex items-center gap-3 transition-all group"
+                                                >
+                                                    <div className="p-2 bg-blue-600 rounded-lg text-white group-hover:scale-110 transition-transform">
+                                                        <Star className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-blue-400">Generate Sub-tasks</h4>
+                                                        <p className="text-xs text-slate-500">Expand this into detailed steps</p>
+                                                    </div>
+                                                </button>
+                                            )}
+
+                                            {/* Generate Content */}
+                                            <button
+                                                onClick={() => handleGenerateContent('resources')}
+                                                disabled={isGenerating}
+                                                className="p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-left flex items-center gap-3 transition-all group"
+                                            >
+                                                <div className="p-2 bg-slate-900 rounded-lg text-blue-400 group-hover:scale-110 transition-transform">
+                                                    <Youtube className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-slate-200">Generate Resources</h4>
+                                                    <p className="text-xs text-slate-500">Find videos and articles</p>
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                onClick={() => handleGenerateContent('quiz')}
+                                                disabled={isGenerating}
+                                                className="p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-left flex items-center gap-3 transition-all group"
+                                            >
+                                                <div className="p-2 bg-slate-900 rounded-lg text-emerald-400 group-hover:scale-110 transition-transform">
+                                                    <HelpCircle className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-slate-200">Generate Quiz</h4>
+                                                    <p className="text-xs text-slate-500">Create a knowledge check</p>
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                onClick={() => handleGenerateContent('tutorial')}
+                                                disabled={isGenerating}
+                                                className="p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-left flex items-center gap-3 transition-all group"
+                                            >
+                                                <div className="p-2 bg-slate-900 rounded-lg text-purple-400 group-hover:scale-110 transition-transform">
+                                                    <BookOpen className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-slate-200">Generate Tutorial</h4>
+                                                    <p className="text-xs text-slate-500">Write a step-by-step guide</p>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -211,11 +348,11 @@ export default function NodeDetailsPanel({ skillName, node, isOpen, onClose, onC
                                     {node.resources && node.resources.length > 0 ? (
                                         <div className="grid gap-3">
                                             {node.resources.map((res, idx) => {
-                                                const linkUrl = res.searchQuery
-                                                    ? (res.type === 'video'
-                                                        ? `https://www.youtube.com/results?search_query=${encodeURIComponent(res.searchQuery)}`
-                                                        : `https://www.google.com/search?q=${encodeURIComponent(res.searchQuery)}`)
-                                                    : res.url || '#';
+                                                const linkUrl = res.url
+                                                    ? res.url
+                                                    : (res.type === 'video'
+                                                        ? `https://www.youtube.com/results?search_query=${encodeURIComponent(res.searchQuery || res.title)}`
+                                                        : `https://www.google.com/search?q=${encodeURIComponent(res.searchQuery || res.title)}`);
 
                                                 return (
                                                     <a
@@ -231,12 +368,14 @@ export default function NodeDetailsPanel({ skillName, node, isOpen, onClose, onC
                                                         <div>
                                                             <h4 className="font-bold text-slate-200 group-hover:text-blue-400 transition-colors">{res.title}</h4>
                                                             <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                                                                {res.searchQuery ? (
-                                                                    <>
-                                                                        <span className="text-blue-400">Search:</span> {res.searchQuery}
-                                                                    </>
+                                                                {res.url ? (
+                                                                    <span className="text-emerald-400 flex items-center gap-1">
+                                                                        Direct Link
+                                                                    </span>
                                                                 ) : (
-                                                                    res.url
+                                                                    <span className="text-blue-400 flex items-center gap-1">
+                                                                        {res.type === 'video' ? 'Find on YouTube' : 'Find on Google'}
+                                                                    </span>
                                                                 )}
                                                             </p>
                                                         </div>
@@ -381,6 +520,7 @@ export default function NodeDetailsPanel({ skillName, node, isOpen, onClose, onC
                                         className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-4 text-slate-200 focus:outline-none focus:border-blue-500 transition-colors resize-none font-mono text-sm leading-relaxed"
                                     />
                                 </div>
+
                             )}
 
                         </div>
@@ -409,7 +549,8 @@ export default function NodeDetailsPanel({ skillName, node, isOpen, onClose, onC
                         </div>
                     </motion.div>
                 </>
-            )}
-        </AnimatePresence>
+            )
+            }
+        </AnimatePresence >
     );
 }

@@ -14,6 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 import Providers from "@/components/Providers";
+import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "SkillForge",
@@ -30,14 +31,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-950 text-slate-100`}
       >
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 md:ml-64 transition-all duration-300">
-            <Providers>
-              {children}
-            </Providers>
-          </main>
-        </div>
+        <Providers>
+          <AppShell>
+            {children}
+          </AppShell>
+        </Providers>
       </body>
     </html>
   );

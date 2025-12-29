@@ -30,7 +30,7 @@ export default function CreateSkillPage() {
             const res = await fetch('/api/generate-skill', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ skill: inputSkill, category: selectedCategory }),
+                body: JSON.stringify({ skill: inputSkill, category: selectedCategory, level: 1 }),
             });
 
             const data = await res.json();
@@ -100,8 +100,8 @@ export default function CreateSkillPage() {
                                     key={cat}
                                     onClick={() => setSelectedCategory(cat)}
                                     className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedCategory === cat
-                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
                                         }`}
                                 >
                                     {cat}

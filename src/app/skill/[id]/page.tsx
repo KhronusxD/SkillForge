@@ -43,21 +43,21 @@ export default function SkillView() {
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
     // Helper to find node recursively
-    const findNode = useCallback((branches: any[], id: string): any => {
+    const findNodeWithDepth = useCallback((branches: any[], id: string, currentDepth: number = 1): { node: any, depth: number } | null => {
         for (const branch of branches) {
-            if (branch.id === id) return branch;
+            if (branch.id === id) return { node: branch, depth: currentDepth };
             if (branch.branches) {
-                const found = findNode(branch.branches, id);
+                const found = findNodeWithDepth(branch.branches, id, currentDepth + 1);
                 if (found) return found;
             }
         }
         return null;
     }, []);
 
-    const selectedNode = useMemo(() => {
+    const selectedNodeData = useMemo(() => {
         if (!skill || !selectedNodeId) return null;
-        return findNode(skill.branches, selectedNodeId);
-    }, [skill, selectedNodeId, findNode]);
+        return findNodeWithDepth(skill.branches, selectedNodeId);
+    }, [skill, selectedNodeId, findNodeWithDepth]);
 
     const onNodeClick = useCallback((_: any, node: any) => {
         setSelectedNodeId(node.id);
@@ -137,8 +137,9 @@ export default function SkillView() {
             {/* Details Panel */}
             <NodeDetailsPanel
                 skillName={skill.skillName}
-                node={selectedNode}
-                isOpen={!!selectedNode}
+                node={selectedNodeData?.node || null}
+                depth={selectedNodeData?.depth || 0}
+                isOpen={!!selectedNodeData}
                 onClose={() => setSelectedNodeId(null)}
                 onComplete={handleCompleteNode}
             />

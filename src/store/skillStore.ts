@@ -19,6 +19,7 @@ interface SkillState {
     setActiveSkill: (id: string) => void;
     completeNode: (skillId: string, nodeId: string) => void;
     updateNodeNotes: (skillId: string, nodeId: string, notes: string) => void;
+    updateNodeData: (skillId: string, nodeId: string, data: Partial<Branch>) => void;
     setGraph: (nodes: Node[], edges: Edge[]) => void;
     setLoading: (loading: boolean) => void;
 
@@ -203,6 +204,36 @@ export const useSkillStore = create<SkillState>()(
                 if (updated) {
                     newSkills[skillIndex] = skill;
                     return { skills: newSkills };
+                }
+
+                return state;
+            }),
+
+            updateNodeData: (skillId, nodeId, data) => set((state) => {
+                const newSkills = [...state.skills];
+                const skillIndex = newSkills.findIndex(s => s.skillName === skillId);
+                if (skillIndex === -1) return state;
+
+                const skill = { ...newSkills[skillIndex] };
+                let updated = false;
+
+                const updateRecursive = (branches: Branch[]) => {
+                    for (let i = 0; i < branches.length; i++) {
+                        if (branches[i].id === nodeId) {
+                            branches[i] = { ...branches[i], ...data };
+                            updated = true;
+                            return;
+                        }
+                        const childBranches = branches[i].branches;
+                        if (childBranches) updateRecursive(childBranches);
+                    }
+                };
+
+                if (skill.branches) updateRecursive(skill.branches);
+
+                if (updated) {
+                    newSkills[skillIndex] = skill;
+                    return { skills: newSkills, version: state.version + 1 };
                 }
 
                 return state;
